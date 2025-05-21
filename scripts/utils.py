@@ -1,56 +1,74 @@
-import json, logging, os, base64, pathlib, hashlib
+# scripts/utils.py
+import json, logging, os, base64, pathlib
 from typing import Dict, List
 
+# ---------- ロガー ----------
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-logging.basicConfig(format="[%(levelname)s] %(message)s", level=LOG_LEVEL)
-logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+logger = logging.getLogger("studyriver-i18n")
 
+# ---------- パス ----------
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
-PROCESSED_FILE = DATA_DIR / "processed.json"
-MAPPING_FILE   = DATA_DIR / "category_mapping.json"
+PROCESSED_FILE      = DATA_DIR / "processed.json"
+CATEGORY_MAP_FILE   = ROOT / "config" / "category_mapping.json"
+TAG_MAP_FILE        = ROOT / "config" / "tag_mapping.json"
 
-# ------------------------------
-# キャッシュ読み書き
-# ------------------------------
+# ==============================================================
+# 既読記事 ID のキャッシュ
+# ==============================================================
+
+def load_processed() -> List[int]:
+    """
+    processed.json から ID の配列を返す。
+    無い or 壊れている場合は空リスト。
+    """
+    if PROCESSED_FILE.exists():
+        try:
+            return json.loads(PROCESSED_FILE.read_text()).get("processed", [])
+        except json.JSONDecodeError:
+            logger.warning("processed.json is malformed – starting fresh.")
+    return []
+
+def save_processed(ids: List[int]) -> None:
+    """
+    ID リストを processed.json に保存（整形付き）。
+    """
+    PROCESSED_FILE.write_text(
+        json.dumps({"processed": sorted(ids)}, ensure_ascii=False, indent=2)
+    )
+
+# ==============================================================
+# カテゴリ／タグ名 → 英語 WP 側 ID のマッピング
+# ==============================================================
 
 def load_mapping() -> Dict[str, Dict[str, int]]:
-    category_file = ROOT / "config" / "category_mapping.json"
-    tag_file = ROOT / "config" / "tag_mapping.json"
+    """
+    戻り値:
+      {
+        \"categories\": {\"未来教育\": 42, ...},
+        \"tags\":       {\"生成AI\":  99, ...}
+      }
+    """
+    mapping = {"categories": {}, "tags": {}}
 
-    mapping = {
-        "categories": {},
-        "tags": {}
-    }
+    if CATEGORY_MAP_FILE.exists():
+        mapping["categories"] = json.loads(CATEGORY_MAP_FILE.read_text())
 
-    if category_file.exists():
-        with category_file.open() as f:
-            mapping["categories"] = json.load(f)
-
-    if tag_file.exists():
-        with tag_file.open() as f:
-            mapping["tags"] = json.load(f)
+    if TAG_MAP_FILE.exists():
+        mapping["tags"] = json.loads(TAG_MAP_FILE.read_text())
 
     return mapping
 
-def save_processed(ids: List[int]):
-    PROCESSED_FILE.write_text(json.dumps({"processed": ids}, ensure_ascii=False, indent=2))
-
-# ------------------------------
-# カテゴリ名→ID 変換
-# ------------------------------
-
-def load_mapping() -> Dict[str, int]:
-    if not MAPPING_FILE.exists():
-        return {}
-    return json.loads(MAPPING_FILE.read_text())
-
-# ------------------------------
-# Basic 認証ヘッダー生成
-# ------------------------------
+# ==============================================================
+# WordPress Basic 認証ヘッダー生成
+# ==============================================================
 
 def basic_auth(user: str, app_pass: str) -> Dict[str, str]:
-    auth = base64.b64encode(f"{user}:{app_pass}".encode()).decode()
-    return {"Authorization": f"Basic {auth}"}
+    token = base64.b64encode(f\"{user}:{app_pass}\".encode()).decode()
+    return {\"Authorization\": f\"Basic {token}\"}
