@@ -1,0 +1,43 @@
+# =============================
+# studyriver-i18n 初期セット
+# ファイルを一つのキャンバスにまとめています。
+# 必要に応じて VSCode 等で個別ファイルに分割してください。
+# =============================
+
+# --------------------------------------------
+# 1) .github/workflows/sync_en.yml
+# --------------------------------------------
+
+name: Sync JP→EN
+
+on:
+  schedule:
+    - cron: '15 * * * *'   # JST 24h=15分に相当
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run sync script
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          WP_URL_EN:      ${{ secrets.WP_URL_EN }}
+          WP_USER_EN:     ${{ secrets.WP_USER_EN }}
+          WP_PASS_EN:     ${{ secrets.WP_PASS_EN }}
+        run: |
+          python scripts/fetch_rss.py && \
+          python scripts/translate_post.py
