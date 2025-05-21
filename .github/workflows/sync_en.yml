@@ -12,7 +12,7 @@ name: Sync JP→EN
 
 on:
   schedule:
-    - cron: '15 * * * *'   # JST 24h=15分に相当
+    - cron: '0 */12 * * *'   # UTC 0:00,12:00
   workflow_dispatch:
 
 jobs:
