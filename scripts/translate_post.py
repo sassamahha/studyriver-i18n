@@ -15,19 +15,26 @@ if not QUEUE_FILE.exists():
     logger.info("Queue empty"); exit()
 
 mapping = load_mapping()
+cat_map = mapping.get("categories", {})
+tag_map = mapping.get("tags", {})
+
 queue = json.loads(QUEUE_FILE.read_text())
 
 for item in queue:
     logger.info(f"Translating post_id={item['post_id']}")
 
     # 1) 日本語 WP から REST API で元記事詳細取得（HTML 含む）
-    res = requests.get(f"https://studyriver.jp/wp-json/wp/v2/posts/{item['post_id']}")
+    res = requests.get(f"https://studyriver.jp/wp-json/wp/v2/posts/{item['post_id']}?_embed")
     res.raise_for_status()
     jp_post = res.json()
 
     jp_title = jp_post['title']['rendered']
     jp_content = jp_post['content']['rendered']
-    cat_names = [c['name'] for c in jp_post.get('_embedded', {{}}).get('wp:term', [[]])[0]] if '_embedded' in jp_post else []
+
+    # カテゴリ名／タグ名抽出
+    terms = jp_post.get('_embedded', {}).get('wp:term', [])
+    cat_names = [c['name'] for c in terms[0]] if len(terms) > 0 else []
+    tag_names = [t['name'] for t in terms[1]] if len(terms) > 1 else []
 
     # 2) GPT 翻訳
     prompt = {
@@ -51,10 +58,10 @@ for item in queue:
         media_id_en = upload_image(img_url)
 
     # 4) カテゴリ map
-    cat_ids_en = [mapping.get(name) for name in cat_names if name in mapping]
+    cat_ids_en = [cat_map.get(name) for name in cat_names if name in cat_map]
 
-    # 5) カテゴリ map
-    tag_ids_en = [mapping["tags"].get(name) for name in tag_names if name in mapping["tags"]]
+    # 5) タグ map
+    tag_ids_en = [tag_map.get(name) for name in tag_names if name in tag_map]
 
     # 6) 投稿
     payload = {

@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """日本語 WP から RSS を取得し、新規記事 ID リストをキュー化する"""
-import os, feedparser, pathlib, json
+import os, feedparser, pathlib, json, sys
+
+# --- GitHub Actions対応: utils.py を scripts/ から読み込む ---
+sys.path.append(str(pathlib.Path(__file__).resolve().parents[1] / "scripts"))
+
 from utils import load_processed, save_processed, logger
 
 WP_RSS_JP = os.getenv("WP_RSS_JP", "https://studyriver.jp/feed")
