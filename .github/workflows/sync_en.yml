@@ -39,5 +39,5 @@ jobs:
           WP_USER_EN:     ${{ secrets.WP_USER_EN }}
           WP_PASS_EN:     ${{ secrets.WP_PASS_EN }}
         run: |
-          python scripts/fetch_rss.py && \
+          python scripts/fetch_rss.py
           python scripts/translate_post.py
