@@ -3,11 +3,11 @@
 import os, requests, sys, json
 from utils import basic_auth, logger
 
-WP_URL_EN = os.getenv("WP_URL_EN")
-WP_USER = os.getenv("WP_USER_EN")
-WP_PASS = os.getenv("WP_PASS_EN")
+WP_URL  = os.getenv("WP_URL")  or os.getenv("WP_URL_EN")
+WP_USER = os.getenv("WP_USER") or os.getenv("WP_USER_EN")
+WP_PASS = os.getenv("WP_PASS") or os.getenv("WP_PASS_EN")
 
-POST_ENDPOINT = f"{WP_URL_EN}/wp-json/wp/v2/posts"
+POST_ENDPOINT = f"{WP_URL}/wp-json/wp/v2/posts"
 
 
 def create_post(payload: dict) -> int:
