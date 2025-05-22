@@ -26,9 +26,9 @@ jobs:
       - name: Run sync for ${{ matrix.lang }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          WP_URL:  ${{ secrets[ format('WP_URL_{0}',  matrix.lang ) ] }}
-          WP_USER: ${{ secrets[ format('WP_USER_{0}', matrix.lang ) ] }}
-          WP_PASS: ${{ secrets[ format('WP_PASS_{0}', matrix.lang ) ] }}
+          WP_URL:  ${{ secrets['WP_URL_'  + matrix.lang.upper()] }}
+          WP_USER: ${{ secrets['WP_USER_' + matrix.lang.upper()] }}
+          WP_PASS: ${{ secrets['WP_PASS_' + matrix.lang.upper()] }}
           TARGET_LANG: ${{ matrix.lang }}
         run: |
           python scripts/fetch_posts.py
