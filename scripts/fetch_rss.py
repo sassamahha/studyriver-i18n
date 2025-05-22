@@ -1,44 +1,33 @@
 #!/usr/bin/env python3
-"""日本語 WP の RSS から新着記事を抽出 → キュー化"""
-import os, feedparser, pathlib, json, sys, re
-
+"""WP REST API で最新記事を取得し、未処理 ID をキュー化"""
+import os, pathlib, json, requests, sys
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1] / "scripts"))
 from utils import load_processed, save_processed, logger
 
-WP_RSS_JP    = os.getenv("WP_RSS_JP", "https://studyriver.jp/feed")
+WP_URL_JP    = os.getenv("WP_URL_JP", "https://studyriver.jp")
 MAX_ARTICLES = int(os.getenv("MAX_ARTICLES", 5))
 QUEUE_FILE   = pathlib.Path("data/rss_queue.json")
+
+API_ENDPOINT = f"{WP_URL_JP}/wp-json/wp/v2/posts"
+PARAMS       = {
+    "per_page": MAX_ARTICLES,
+    "_fields": "id,title,link,date"
+}
 
 processed = set(load_processed())
 new_items = []
 
-def extract_post_id(entry) -> int | None:
-    """
-    1) ?p=12345
-    2) https://.../YYYY/MM/12345/ or .../12345
-    のどちらかから post_id(int) を返す
-    """
-    for url in (getattr(entry, "id", ""), getattr(entry, "link", "")):
-        if not url:
-            continue
-        m = re.search(r"[?&]p=(\\d+)", url)
-        if m:
-            return int(m.group(1))
-        m = re.search(r"/(\\d{2,})/?$", url)
-        if m:
-            return int(m.group(1))
-    return None
+resp = requests.get(API_ENDPOINT, params=PARAMS, timeout=20)
+resp.raise_for_status()
 
-feed = feedparser.parse(WP_RSS_JP)
-
-for entry in feed.entries[:MAX_ARTICLES]:
-    post_id = extract_post_id(entry)
-    if post_id and post_id not in processed:
+for post in resp.json():
+    post_id = post["id"]
+    if post_id not in processed:
         new_items.append({
-            "post_id": post_id,
-            "title": entry.title,
-            "link":  entry.link,
-            "published": entry.published,
+            "post_id":   post_id,
+            "title":     post["title"]["rendered"],
+            "link":      post["link"],
+            "published": post["date"],
         })
         processed.add(post_id)
 
