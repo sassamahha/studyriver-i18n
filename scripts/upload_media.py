@@ -3,12 +3,13 @@
 import os, requests, mimetypes, tempfile, pathlib, sys
 from utils import basic_auth, logger
 
-WP_URL_EN = os.getenv("WP_URL_EN")  # https://studyriver.jp/en
-WP_USER = os.getenv("WP_USER_EN")
-WP_PASS = os.getenv("WP_PASS_EN")
+# --- env 読み込み（汎用→EN fallback） -----------------------------
+WP_URL  = os.getenv("WP_URL")  or os.getenv("WP_URL_EN")
+WP_USER = os.getenv("WP_USER") or os.getenv("WP_USER_EN")
+WP_PASS = os.getenv("WP_PASS") or os.getenv("WP_PASS_EN")
 
-if not WP_URL_EN:
-    logger.error("WP_URL_EN not set"); sys.exit(1)
+if not WP_URL:
+    logger.error("WP_URL not set"); sys.exit(1)
 
 MEDIA_ENDPOINT = f"{WP_URL_EN}/wp-json/wp/v2/media"
 
