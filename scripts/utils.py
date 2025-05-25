@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
-"""共通ユーティリティ"""
+"""共通ユーティリティ（fetch / translate / post スクリプトで共有）"""
 
-import json, logging, os, base64, pathlib
+from __future__ import annotations
+
+import base64
+import json
+import logging
+import os
+import pathlib
+import re
+import unicodedata
 from typing import Dict, List
 
 # ──────────────────────────
@@ -17,20 +25,34 @@ logger = logging.getLogger("studyriver-i18n")
 # ──────────────────────────
 # パス設定
 # ──────────────────────────
-ROOT      = pathlib.Path(__file__).resolve().parents[1]
-DATA_DIR  = ROOT / "data"
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+DATA_DIR = ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
 PROCESSED_FILE     = DATA_DIR / "processed.json"
-CATEGORY_MAP_FILE  = DATA_DIR / "category_mapping.json"   # ← data/ 配置に合わせて修正
+CATEGORY_MAP_FILE  = DATA_DIR / "category_mapping.json"
 TAG_MAP_FILE       = DATA_DIR / "tag_mapping.json"
+
+# ==============================================================
+# slug 生成ユーティリティ（Polylang 用）
+# ==============================================================
+
+def _basic_slug(text: str) -> str:
+    """日本語かな漢字混在でも読める slug を生成"""
+    text = unicodedata.normalize("NFKD", text).lower()
+    text = re.sub(r"[\u3000\s]+", "-", text)          # 全角スペース含む空白→-
+    text = re.sub(r"[^0-9a-z\-ぁ-ん一-龥]+", "", text) # 記号削除
+    return text.strip("-")[:80]
+
+def slugify_for_lang(text: str, lang: str) -> str:
+    """lang/slug 形式を返す"""
+    return f"{lang}/{_basic_slug(text)}"
 
 # ==============================================================
 # 既読記事 ID キャッシュ
 # ==============================================================
 
 def load_processed() -> List[int]:
-    """processed.json から ID 配列を取得。無ければ空リスト。"""
     if PROCESSED_FILE.exists():
         try:
             return json.loads(PROCESSED_FILE.read_text()).get("processed", [])
@@ -39,23 +61,16 @@ def load_processed() -> List[int]:
     return []
 
 def save_processed(ids: List[int]) -> None:
-    """ID 配列を processed.json に保存（ソート付き）。"""
     PROCESSED_FILE.write_text(
         json.dumps({"processed": sorted(ids)}, ensure_ascii=False, indent=2)
     )
 
 # ==============================================================
-# カテゴリ／タグ名 → EN-WP 側 ID 取得
+# カテゴリ／タグ名 → WP ID 取得
 # ==============================================================
 
 def load_mapping() -> Dict[str, Dict[str, int]]:
-    """
-    {
-      "categories": {"未来教育": 42, ...},
-      "tags":       {"生成AI":  99, ...}
-    }
-    """
-    mapping = {"categories": {}, "tags": {}}
+    mapping: Dict[str, Dict[str, int]] = {"categories": {}, "tags": {}}
 
     if CATEGORY_MAP_FILE.exists():
         mapping["categories"] = json.loads(CATEGORY_MAP_FILE.read_text())
@@ -70,6 +85,5 @@ def load_mapping() -> Dict[str, Dict[str, int]]:
 # ==============================================================
 
 def basic_auth(user: str, app_pass: str) -> Dict[str, str]:
-    """user と Application Password から Basic 認証ヘッダーを作成。"""
     token = base64.b64encode(f"{user}:{app_pass}".encode()).decode()
     return {"Authorization": f"Basic {token}"}
