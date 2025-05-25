@@ -1,9 +1,5 @@
-name: sync-news
-
+name: sync-news-test
 on:
-  # JST 20:00 = UTC 11:00
-  schedule:
-    - cron: "0 11 * * *"
   workflow_dispatch:
 
 jobs:
@@ -17,20 +13,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
-
       - run: pip install -r requirements.txt
 
-      # ① 日本語記事をキュー化
       - name: Fetch JP posts
-        run: python scripts/fetch_rss.py
+        run: python scripts/fetch_rss.py      # ← ここで queue を生成
 
-      # ② 十分な揺らぎバッファ（10 分）
-      - name: Wait for cache settle
-        run: sleep 600
-
-      # ③ 10 言語翻訳 & 投稿
       - name: Translate & publish 10 langs
         run: python scripts/translate_post.py
