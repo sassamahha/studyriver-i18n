@@ -1,31 +1,50 @@
-import os, json, base64, requests, pathlib
-from utils import slugify_for_lang
+#!/usr/bin/env python3
+"""
+WordPress REST (Polylang) 投稿ユーティリティ
 
-WP_URL  = os.environ["WP_URL"].rstrip("/")
-AUTH    = base64.b64encode(f"{os.environ['WP_USER']}:{os.environ['WP_PASS']}").decode()
+create_post(payload, lang=…, ja_id=…) を呼び出すと
+  1. lang 用サブディレクトリ (/en/, /es/…) に投稿
+  2. translations={ja: ja_id} で日本語記事とひも付け
+  3. 成功したら公開先 URL と新記事 ID を返す
+"""
+
+from __future__ import annotations
+import base64
+import json
+import os
+from typing import Dict, Tuple
+
+import requests
+
+# ──────────────────────────
+# 環境変数
+# ──────────────────────────
+WP_URL = os.environ["WP_URL"].rstrip("/")               # https://studyriver.jp/wp-json/wp/v2
+AUTH   = base64.b64encode(
+    f"{os.environ['WP_USER']}:{os.environ['WP_PASS']}".encode()
+).decode()
+
 HEADERS = {
     "Authorization": f"Basic {AUTH}",
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
 }
 
-LANGS = [
-    "en", "es", "zhhans", "zhhant", "pt", "id", "fr", "it", "de"
-]
+# ──────────────────────────
+# Public API
+# ──────────────────────────
+def create_post(payload: Dict, *, lang: str, ja_id: int) -> Tuple[int, str]:
+    """
+    payload : WP post JSON (title, content, slug, …)
+    lang    : en / es / zhhans / …
+    ja_id   : 元記事 (日本語) の Post ID
+    return  : (new_id, link)
+    """
+    url  = f"{WP_URL}/posts?lang={lang}"
+    data = payload | {"translations": {"ja": ja_id}}
 
-RAW_DIR = pathlib.Path("data/translated")
+    r = requests.post(url, headers=HEADERS, data=json.dumps(data), timeout=15)
+    r.raise_for_status()
 
-def post_article(path: pathlib.Path):
-    ja_id = json.loads(path.read_text())['ja_id']
-    for lang in LANGS:
-        payload = json.load((RAW_DIR / f"{lang}_{path.stem}.json").open())
-        payload["slug"] = slugify_for_lang(payload["title"], lang)
-        payload["status"] = "publish"
-        payload["translations"] = {"ja": ja_id}
-        url = f"{WP_URL}/posts?lang={lang}"
-        r = requests.post(url, headers=HEADERS, data=json.dumps(payload))
-        r.raise_for_status()
-        print(f"✓ {lang} ->", r.json().get("link"))
+    js  = r.json()
+    return js["id"], js.get("link")  # (new_id, permalink)
 
-if __name__ == "__main__":
-    for file in RAW_DIR.glob("*.json"):
-        post_article(file)
