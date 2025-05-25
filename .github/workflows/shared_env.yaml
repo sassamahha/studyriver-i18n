@@ -1,5 +1,11 @@
-# CI で読み込む共通環境変数（plain ENV で override 可）
-WP_URL_JP: "https://studyriver.jp"
-WP_RSS_JP: "https://studyriver.jp/feed"
-DEFAULT_LANGUAGE: "en"
-MAX_ARTICLES: 5  # 1 サイクルで翻訳する最大記事数
+name: shared-env
+
+env:
+  WP_URL:  "https://studyriver.jp/wp-json/wp/v2"
+  OPENAI_MODEL: "gpt-4o-mini"
+
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "shared env"
