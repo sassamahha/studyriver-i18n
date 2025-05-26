@@ -78,46 +78,61 @@ for item in queue:
     cat_ids = [c["id"] for c in term[0]]
     tag_ids = [t["id"] for t in term[1]]
 
-    # ───────── 翻訳ループ ─────────
-    for lang in LANGS:
-        lang_full = LANG_NAME.get(lang, lang)
-        logger.info(f"[{lang}] translating id={ja_id}")
+# ───────── 翻訳ループ ─────────
+for lang in LANGS:
+    lang_full = LANG_NAME.get(lang, lang)
+    logger.info(f"[{lang}] translating id={ja_id}")
 
-        prompt = {
-            "role": "user",
-            "content": (
-                'Return ONLY valid JSON like '
-                '{"title":...,"content":...,"excerpt":...} translating the '
-                f'article below to **{lang_full}**. Keep original HTML tags.\n---\n{body}'
-            ),
-        }
+    base_prompt = {
+        "role": "user",
+        "content": (
+            'Return ONLY valid JSON like '
+            '{"title":...,"content":...,"excerpt":...} translating the '
+            f'article below to **{lang_full}**. Keep original HTML tags.\n---\n{body}'
+        ),
+    }
+
+    # ─── 1st try ───
+    try:
         rsp = client.chat.completions.create(
-            model="gpt-4o-mini", messages=[prompt]
+            model="gpt-4o-mini",
+            messages=[base_prompt],
+            timeout=45,
         )
+        tr = safe_json(rsp.choices[0].message.content)
+
+    # ─── retry: 強制 JSON モード ───
+    except Exception as first_err:
+        logger.warning(f"parse fail ({lang}) – retry JSON mode: {first_err}")
         try:
-            tr = safe_json(rsp.choices[0].message.content)
-        except Exception as e:
-            logger.error(f"JSON parse error ({lang}): {e}")
-            continue
+            rsp = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[base_prompt],
+                response_format={"type": "json_object"},
+                timeout=45,
+            )
+            tr = json.loads(rsp.choices[0].message.content)   # safe_json でなく直接 OK
+        except Exception as second_err:
+            logger.error(f"giving up ({lang}) – still invalid JSON: {second_err}")
+            continue   # → 次の言語へ
 
-        media_id = upload_image(feat_src) if feat_src else None
+    media_id = upload_image(feat_src) if feat_src else None
+    payload = {
+        "title": tr["title"],
+        "content": tr["content"],
+        "excerpt": tr["excerpt"],
+        "slug": slugify(tr["title"]),
+        "featured_media": media_id,
+        "categories": cat_ids,
+        "tags": tag_ids,
+        "status": "publish",
+    }
 
-        payload = {
-            "title": tr["title"],
-            "content": tr["content"],
-            "excerpt": tr["excerpt"],
-            "slug": slugify(tr["title"]),
-            "featured_media": media_id,
-            "categories": cat_ids,
-            "tags": tag_ids,
-            "status": "publish",
-        }
-
-        try:
-            new_id, link = create_post(payload, lang=lang, ja_id=ja_id)
-            logger.info(f"✓ {lang} → {link}")
-        except Exception as e:
-            logger.error(f"WP error ({lang}): {e}")
+    try:
+        new_id, link = create_post(payload, lang=lang, ja_id=ja_id)
+        logger.info(f"✓ {lang} => {link}")
+    except Exception as e:
+        logger.error(f"WP error ({lang}): {e}")
 
 logger.info("finished queue; removing file")
 QUEUE_FILE.unlink(missing_ok=True)
