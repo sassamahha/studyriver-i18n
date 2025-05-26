@@ -1,55 +1,71 @@
 #!/usr/bin/env python3
-"""最新 1 記事だけ queue に追加"""
+"""
+最新 1 記事だけをキュー (data/rss_queue.json) に追加するスクリプト
+--------------------------------------------------------------------
+✓ RSS は使わず WordPress REST API で取得
+✓ 既に処理済み ID はスキップ
+✓ キューに追加したら processed.json を更新
+"""
 
-import json, pathlib, re
-import feedparser
-from utils import logger, load_processed, save_processed
+from __future__ import annotations
+import json, os, pathlib, sys
+import requests
+# 自作 utils を読むための path 追加
+sys.path.append(str(pathlib.Path(__file__).resolve().parents[1] / "scripts"))
+from utils import load_processed, save_processed, logger  # noqa: E402
 
-RSS_URL = "https://studyriver.jp/feed/"
-QUEUE   = pathlib.Path("data/rss_queue.json")
+# ──────────────────────────
+# 設定
+# ──────────────────────────
+WP_URL_JP   = os.getenv("WP_URL_JP", "https://studyriver.jp")
+QUEUE_FILE  = pathlib.Path("data/rss_queue.json")
+QUEUE_FILE.parent.mkdir(exist_ok=True, parents=True)
 
-# 正規表現 例: https://studyriver.jp/?p=12345
-_ID_RE  = re.compile(r"[?&]p=(\d+)")
+API_ENDPOINT = f"{WP_URL_JP}/wp-json/wp/v2/posts"
+PARAMS       = {"per_page": 1, "_fields": "id,title,link,date"}   # ← 最新 1 件固定
 
-def extract_post_id(entry) -> int | None:
-    """feed entry から WP 投稿 ID を見つける"""
-    # 1) WP が吐き出す拡張フィールド
-    pid = entry.get("wp_post_id") or entry.get("post_id")
-    if pid and pid.isdigit():
-        return int(pid)
+# ──────────────────────────
+# 既読キャッシュ読み込み
+# ──────────────────────────
+processed: set[int] = set(load_processed())
+queue: list[dict]   = []
 
-    # 2) permalink に ?p=123 が付く場合
-    for url in (entry.get("id"), entry.get("link")):
-        if not url:
-            continue
-        m = _ID_RE.search(url)
-        if m:
-            return int(m.group(1))
-    return None   # 見つからない
+# ──────────────────────────
+# 投稿取得 & キュー生成
+# ──────────────────────────
+try:
+    resp = requests.get(API_ENDPOINT, params=PARAMS, timeout=15)
+    resp.raise_for_status()
+    posts = resp.json()
+except Exception as e:
+    logger.error(f"API fetch failed: {e}")
+    sys.exit(1)
 
-# --------------------
+if not posts:
+    logger.info("No posts returned from API")
+    sys.exit(0)
 
-feed = feedparser.parse(RSS_URL)
-latest = feed.entries[:1]          # すでに pubDate 降順なので 1件
+post = posts[0]                 # 最新 1 件だけ見る
+pid  = post["id"]
 
-processed = set(load_processed())
-queue = []
+if pid in processed:
+    logger.info(f"Already processed id={pid}")
+    sys.exit(0)
 
-for ent in latest:
-    pid = extract_post_id(ent)
-    if not pid:
-        logger.warning("post ID not found – skipped an entry")
-        continue
-    if pid in processed:
-        logger.info(f"id={pid} already processed")
-        continue
-    queue.append({"post_id": pid})
-    processed.add(pid)
+queue.append(
+    {
+        "post_id":   pid,
+        "title":     post["title"]["rendered"],
+        "link":      post["link"],
+        "published": post["date"],
+    }
+)
+processed.add(pid)
 
-if queue:
-    QUEUE.write_text(json.dumps(queue, ensure_ascii=False, indent=2))
-    save_processed(list(processed))
-    logger.info(f"queued 1 item → {QUEUE}")
-else:
-    logger.info("no new item to queue")
+# ──────────────────────────
+# 保存
+# ──────────────────────────
+QUEUE_FILE.write_text(json.dumps(queue, indent=2, ensure_ascii=False))
+save_processed(sorted(processed))
 
+logger.info(f"✓ queued 1 post (id={pid}) → {QUEUE_FILE}")
