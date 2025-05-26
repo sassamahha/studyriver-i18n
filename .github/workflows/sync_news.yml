@@ -27,8 +27,8 @@ jobs:
         run: python scripts/fetch_rss.py
 
       # 3) バッファ 15 分
-      - name: Wait for JP post settle
-        run: sleep 900   # 15 * 60
+      # - name: Wait for JP post settle
+      #  run: sleep 900   # 15 * 60
 
       # 4) 10 言語へ翻訳 & 投稿
       - name: Translate & publish 10 languages
