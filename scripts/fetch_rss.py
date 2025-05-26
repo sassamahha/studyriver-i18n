@@ -1,30 +1,55 @@
 #!/usr/bin/env python3
-"""日本語 RSS を読み取り → 最新 1 記事だけ data/rss_queue.json へ"""
+"""最新 1 記事だけ queue に追加"""
 
-import feedparser, pathlib, json, time
+import json, pathlib, re
+import feedparser
 from utils import logger, load_processed, save_processed
 
-RSS_URL  = "https://studyriver.jp/feed/"
-QUEUE    = pathlib.Path("data/rss_queue.json")
+RSS_URL = "https://studyriver.jp/feed/"
+QUEUE   = pathlib.Path("data/rss_queue.json")
 
-parsed   = feedparser.parse(RSS_URL)
-processed_ids = set(load_processed())
+# 正規表現 例: https://studyriver.jp/?p=12345
+_ID_RE  = re.compile(r"[?&]p=(\d+)")
 
-# ── pubDate 降順で並び替えして先頭 1 件だけ
-items = sorted(parsed.entries, key=lambda e: e.published_parsed, reverse=True)[:1]
+def extract_post_id(entry) -> int | None:
+    """feed entry から WP 投稿 ID を見つける"""
+    # 1) WP が吐き出す拡張フィールド
+    pid = entry.get("wp_post_id") or entry.get("post_id")
+    if pid and pid.isdigit():
+        return int(pid)
 
+    # 2) permalink に ?p=123 が付く場合
+    for url in (entry.get("id"), entry.get("link")):
+        if not url:
+            continue
+        m = _ID_RE.search(url)
+        if m:
+            return int(m.group(1))
+    return None   # 見つからない
+
+# --------------------
+
+feed = feedparser.parse(RSS_URL)
+latest = feed.entries[:1]          # すでに pubDate 降順なので 1件
+
+processed = set(load_processed())
 queue = []
-for e in items:
-    post_id = int(e.id.split("=")[-1])
-    if post_id in processed_ids:
-        logger.info(f"skip already processed id={post_id}")
+
+for ent in latest:
+    pid = extract_post_id(ent)
+    if not pid:
+        logger.warning("post ID not found – skipped an entry")
         continue
-    queue.append({"post_id": post_id})
-    processed_ids.add(post_id)
+    if pid in processed:
+        logger.info(f"id={pid} already processed")
+        continue
+    queue.append({"post_id": pid})
+    processed.add(pid)
 
 if queue:
     QUEUE.write_text(json.dumps(queue, ensure_ascii=False, indent=2))
-    save_processed(list(processed_ids))
+    save_processed(list(processed))
     logger.info(f"queued 1 item → {QUEUE}")
 else:
-    logger.info("no new item")
+    logger.info("no new item to queue")
+
