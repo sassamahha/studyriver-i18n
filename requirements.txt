@@ -3,4 +3,5 @@ requests>=2.31.0
 python-slugify>=8.0
 python-dotenv>=1.0
 html2text>=2020.1.16
+feedparser>=6.0
 opencc-python-reimplemented
