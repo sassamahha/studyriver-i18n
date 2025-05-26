@@ -1,34 +1,30 @@
 #!/usr/bin/env python3
-"""WP REST API で最新記事を取得し、未処理 ID をキュー化"""
-import os, pathlib, json, requests, sys
-sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]/"scripts"))
-from utils import load_processed, save_processed, logger
+"""日本語 RSS を読み取り → 最新 1 記事だけ data/rss_queue.json へ"""
 
-WP_URL_JP    = os.getenv("WP_URL_JP", "https://studyriver.jp")
-MAX_ARTICLES = int(os.getenv("MAX_ARTICLES", 5))
-QUEUE_FILE   = pathlib.Path("data/rss_queue.json")
-API_ENDPOINT = f"{WP_URL_JP}/wp-json/wp/v2/posts"
-PARAMS       = {"per_page": MAX_ARTICLES, "_fields": "id,title,link,date"}
+import feedparser, pathlib, json, time
+from utils import logger, load_processed, save_processed
 
-processed = set(load_processed())
-new_items = []
+RSS_URL  = "https://studyriver.jp/feed/"
+QUEUE    = pathlib.Path("data/rss_queue.json")
 
-resp = requests.get(API_ENDPOINT, params=PARAMS, timeout=20)
-resp.raise_for_status()
-for post in resp.json():
-    pid = post["id"]
-    if pid not in processed:
-        new_items.append({
-            "post_id": pid,
-            "title": post["title"]["rendered"],
-            "link": post["link"],
-            "published": post["date"],
-        })
-        processed.add(pid)
+parsed   = feedparser.parse(RSS_URL)
+processed_ids = set(load_processed())
 
-if new_items:
-    logger.info(f"Queued {len(new_items)} items → {QUEUE_FILE}")
-    QUEUE_FILE.write_text(json.dumps(new_items, ensure_ascii=False, indent=2))
-    save_processed(sorted(processed))
+# ── pubDate 降順で並び替えして先頭 1 件だけ
+items = sorted(parsed.entries, key=lambda e: e.published_parsed, reverse=True)[:1]
+
+queue = []
+for e in items:
+    post_id = int(e.id.split("=")[-1])
+    if post_id in processed_ids:
+        logger.info(f"skip already processed id={post_id}")
+        continue
+    queue.append({"post_id": post_id})
+    processed_ids.add(post_id)
+
+if queue:
+    QUEUE.write_text(json.dumps(queue, ensure_ascii=False, indent=2))
+    save_processed(list(processed_ids))
+    logger.info(f"queued 1 item → {QUEUE}")
 else:
-    logger.info("No new items found.")
+    logger.info("no new item")
