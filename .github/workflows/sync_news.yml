@@ -1,9 +1,11 @@
 name: sync-news
 
 on:
-  # JST 19:30 = UTC 10:30  毎日
   schedule:
-    - cron: "30 10 * * *"
+    # JST 19:30 ＝ UTC 10:30（メイン記事用／毎日）
+    - cron: '30 10 * * *'
+    # JST 09:00 ＝ UTC 00:00（Kids 用／火・木だけ）
+    - cron: '0 0 * * 2,4'
   workflow_dispatch:
 
 jobs:
