@@ -52,6 +52,7 @@ LANG_NAME = {
     "fa": "Persian(Farsi)",
     "hi": "Hindi",
     "sw": "Swahili",
+    "uk": "Ukrainian",
     "sr": "Serbian",
     "hu": "Hungarian",
 }
