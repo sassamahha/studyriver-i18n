@@ -28,7 +28,8 @@ if not QUEUE_FILE.exists():
     sys.exit(0)
 
 # 投稿対象言語
-LANGS = ["en","es","zhhans","zhhant","pt","id","fr","it","de"]
+LANGS = ["en","es","zhhans","zhhant","pt","id","fr","it","de",
+    "ru","tr","ar","ko","th","vi","pl","fa","hi","sw","uk","sr","hu"]
 
 # GPT に渡す正式名称マップ
 LANG_NAME = {
@@ -41,6 +42,18 @@ LANG_NAME = {
     "fr": "French",
     "it": "Italian",
     "de": "German",
+    "ru": "Russian",
+    "tr": "Turkish",
+    "ar": "Arabic",
+    "ko": "Korean",
+    "th": "Thai",
+    "vi": "Vietnamese",
+    "pl": "Polish",
+    "fa": "Persian(Farsi)",
+    "hi": "Hindi",
+    "sw": "Swahili",
+    "sr": "Serbian",
+    "hu": "Hungarian",
 }
 
 _JSON = re.compile(r"\{[\s\S]+?\}")
