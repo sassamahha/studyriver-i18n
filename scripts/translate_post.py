@@ -28,34 +28,36 @@ if not QUEUE_FILE.exists():
     sys.exit(0)
 
 # 投稿対象言語
-LANGS = ["en","es","zhhans","zhhant","pt","id","fr","it","de",
-    "ru","tr","ar","ko","th","vi","pl","fa","hi","sw","uk","sr","hu"]
+LANGS = ["en","es","pt","fr","de","it","zhhans","zhhant","ko",
+         "hi","bn","ur","vi","th","id","tl",
+         "ar","fa","tr","ru","uk","pl","sw"]
 
 # GPT に渡す正式名称マップ
 LANG_NAME = {
     "en": "English",
     "es": "Spanish",
+    "pt": "Portuguese",
+    "fr": "French",
+    "de": "German",
+    "it": "Italian",
     "zhhans": "Simplified Chinese",
     "zhhant": "Traditional Chinese",
-    "pt": "Portuguese",
-    "id": "Indonesian",
-    "fr": "French",
-    "it": "Italian",
-    "de": "German",
-    "ru": "Russian",
-    "tr": "Turkish",
-    "ar": "Arabic",
     "ko": "Korean",
-    "th": "Thai",
-    "vi": "Vietnamese",
-    "pl": "Polish",
-    "fa": "Persian(Farsi)",
     "hi": "Hindi",
-    "sw": "Swahili",
+    "bn": "Bengali",
+    "ur": "Urdu",
+    "vi": "Vietnamese",
+    "th": "Thai",
+    "id": "Indonesian",
+    "tl": "Tagalog (Filipino)",
+    "ar": "Arabic",
+    "fa": "Persian(Farsi)",
+    "tr": "Turkish",
+    "ru": "Russian",
     "uk": "Ukrainian",
-    "sr": "Serbian",
-    "hu": "Hungarian",
-}
+    "pl": "Polish",
+    "sw": "Swahili"
+    }
 
 _JSON = re.compile(r"\{[\s\S]+?\}")
 
