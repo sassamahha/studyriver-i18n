@@ -134,14 +134,14 @@ for lang in LANGS:
 
     media_id = upload_image(feat_src) if feat_src else None
     payload = {
-        "title": tr["title"],
+        "title": tr["title"].replace("\n", " "),
         "content": tr["content"],
-        "excerpt": tr["excerpt"],
-        "slug": slugify(tr["title"]),
-        "featured_media": media_id,
+        "slug": slugify(f"{tr['title']}-{lang}"),
         "categories": cat_ids,
         "tags": tag_ids,
         "status": "publish",
+        **({"excerpt": tr.get("excerpt") or jp_excerpt[:120]}),
+        **({"featured_media": media_id} if media_id else {}),
     }
 
     try:
